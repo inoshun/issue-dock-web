@@ -1,6 +1,6 @@
 # サインアップ画面の実装設計
 
-[画面仕様](signup-specification.md)を実装するときの構成と導入方針を定める。現時点の Web リポジトリは Next.js 16.3.5、React 19.2.8、Tailwind CSS 4 を使用し、画面は初期テンプレートのまま。ここに記す依存関係、ルート、環境変数は実装時に追加する。
+[画面仕様](signup-specification.md)の実装構成と導入方針を記録する。Web リポジトリは Next.js 16.3.5、React 19.2.8、Tailwind CSS 4 を使用する。サインアップ画面と、ここに記す依存関係・環境変数は実装済み。
 
 ## 採用するもの
 
@@ -33,7 +33,7 @@ sequenceDiagram
 
 隣の `issue-dock-api/src/main.ts` では `app.enableCors({ origin: 'http://localhost:3001' })` が設定されており、ローカルの許可元は対応済み。本番の `https://issue-dock.com` は、フロントエンドのデプロイ完了後に許可元へ追加する予定。現状の設定だけでは本番画面からの直接呼び出しは成功しないため、本番で登録フローを公開する前に API 側の設定とデプロイを完了する。`POST` と `Content-Type` を含む事前確認への応答も確認する。許可元は環境ごとに設定し、無条件の全許可は避ける。サインアップの現行 API は Cookie 認証を使わないため、認証情報付き CORS はこの画面に不要。将来ログインを Cookie 方式にする場合は、Cookie 属性、`credentials`、CORS の認証情報設定をまとめて設計する。
 
-## 配置案
+## ファイル配置
 
 ```text
 src/app/signup/page.tsx          /signup のタイトルとフォーム配置
@@ -46,9 +46,9 @@ src/components/ui/              画面で使う shadcn/ui コンポーネント
 
 ## 環境変数とポート
 
-実装時に `package.json` の `dev` を `next dev --port 3001` に変更する。本番起動用の `start` は `next start` のままにして、ホスティング環境の `PORT` を受け付ける。ローカルで本番ビルドを確認するときは `npm run start -- --port 3001` を使用する。
+`package.json` の `dev` は `next dev --port 3001` に設定済み。本番起動用の `start` は `next start` のままにして、ホスティング環境の `PORT` を受け付ける。ローカルで本番ビルドを確認するときは `npm run start -- --port 3001` を使用する。
 
-ローカルのプロジェクトルートに `.env.local` を作る。
+ローカルでは `.env.example` をプロジェクトルートの `.env.local` にコピーする。
 
 ```dotenv
 NEXT_PUBLIC_API_BASE_URL=http://localhost:3000
