@@ -27,14 +27,6 @@ import {
 } from "@/utils/apis/registerUser";
 import { ApiError } from "@/utils/post";
 
-function getSubmissionErrorMessage(error: Error) {
-  if (error instanceof ApiError && error.status === 409) {
-    return null;
-  }
-
-  return "登録できませんでした。もう一度お試しください。";
-}
-
 function FieldMessage({ id, message }: { id: string; message?: string }) {
   if (!message) {
     return null;
@@ -73,7 +65,14 @@ export function SignupForm() {
     },
   });
 
-  const registerUserMutation = useMutation<void, Error, RegisterUserRequest>({
+  const {
+    mutate,
+    isError: isMutationError,
+    isIdle: isMutationIdle,
+    isPending: isMutationPending,
+    isSuccess: isMutationSuccess,
+    reset: resetMutation,
+  } = useMutation<void, Error, RegisterUserRequest>({
     mutationKey: ["users", "register"],
     mutationFn: registerUser,
     onSuccess: () => {
@@ -91,29 +90,23 @@ export function SignupForm() {
 
   const onSubmit = (values: SignupFormValues) => {
     clearErrors("email");
-    registerUserMutation.mutate({
+    mutate({
       email: normalizeEmail(values.email),
       name: values.username,
       password: values.password,
     });
   };
 
-  const submissionErrorMessage = registerUserMutation.isError
-    ? getSubmissionErrorMessage(registerUserMutation.error)
-    : null;
-
   return (
     <form
       noValidate
       onSubmit={handleSubmit(onSubmit)}
       onChange={() => {
-        if (!registerUserMutation.isIdle) {
-          registerUserMutation.reset();
-        }
+        if (!isMutationIdle) resetMutation();
       }}
       className="space-y-5"
     >
-      <fieldset disabled={registerUserMutation.isPending} className="space-y-5">
+      <fieldset disabled={isMutationPending} className="space-y-5">
         <div>
           <Label htmlFor="email">メールアドレス</Label>
           <Input
@@ -238,18 +231,18 @@ export function SignupForm() {
           />
         </div>
 
-        {(registerUserMutation.isSuccess || submissionErrorMessage) && (
+        {(isMutationSuccess || isMutationError) && (
           <div
-            role={submissionErrorMessage ? "alert" : "status"}
+            role={isMutationError ? "alert" : "status"}
             aria-live="polite"
             className={cn(
               "flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm leading-5",
-              submissionErrorMessage
+              isMutationError
                 ? "border-red-200 bg-red-50 text-red-700"
                 : "border-emerald-200 bg-emerald-50 text-emerald-800",
             )}
           >
-            {submissionErrorMessage ? (
+            {isMutationError ? (
               <AlertCircle
                 aria-hidden="true"
                 className="mt-0.5 size-4.5 shrink-0"
@@ -261,8 +254,9 @@ export function SignupForm() {
               />
             )}
             <span>
-              {submissionErrorMessage ??
-                "登録が完了しました。IssueDockへようこそ！"}
+              {isMutationSuccess
+                ? "登録が完了しました。IssueDockへようこそ！"
+                : "登録できませんでした。もう一度お試しください。"}
             </span>
           </div>
         )}
@@ -270,12 +264,12 @@ export function SignupForm() {
         <Button
           type="submit"
           className="mt-2 w-full"
-          disabled={registerUserMutation.isPending}
+          disabled={isMutationPending}
         >
-          {registerUserMutation.isPending && (
+          {isMutationPending && (
             <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
           )}
-          {registerUserMutation.isPending ? "登録しています…" : "登録する"}
+          {isMutationPending ? "登録しています…" : "登録する"}
         </Button>
       </fieldset>
 
