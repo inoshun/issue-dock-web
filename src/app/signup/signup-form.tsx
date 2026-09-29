@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
 import {
   AlertCircle,
   CheckCircle2,
@@ -20,29 +21,18 @@ import {
   type SignupFormValues,
 } from "@/lib/signup-schema";
 import { cn } from "@/lib/utils";
+import {
+  registerUser,
+  type RegisterUserRequest,
+} from "@/utils/apis/registerUser";
+import { ApiError } from "@/utils/post";
 
-type SubmissionStatus = {
-  type: "success" | "error";
-  message: string;
-} | null;
-
-const REQUEST_TIMEOUT_MS = 10_000;
-
-function createUsersUrl() {
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-
-  if (!baseUrl) {
-    throw new Error("API base URL is not configured");
+function getSubmissionErrorMessage(error: Error) {
+  if (error instanceof ApiError && error.status === 409) {
+    return null;
   }
 
-  const normalizedBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
-  const url = new URL("users", normalizedBaseUrl);
-
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("API base URL must use HTTP or HTTPS");
-  }
-
-  return url;
+  return "登録できませんでした。もう一度お試しください。";
 }
 
 function FieldMessage({ id, message }: { id: string; message?: string }) {
@@ -61,16 +51,15 @@ export function SignupForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirmation, setShowPasswordConfirmation] =
     useState(false);
-  const [submissionStatus, setSubmissionStatus] =
-    useState<SubmissionStatus>(null);
 
   const {
     register,
     handleSubmit,
     reset,
+    clearErrors,
     setError,
     setFocus,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
     mode: "onBlur",
@@ -84,95 +73,47 @@ export function SignupForm() {
     },
   });
 
-  const onSubmit = async (values: SignupFormValues) => {
-    setSubmissionStatus(null);
-
-    let usersUrl: URL;
-    try {
-      usersUrl = createUsersUrl();
-    } catch {
-      setSubmissionStatus({
-        type: "error",
-        message:
-          "接続先が設定されていません。時間をおいてもう一度お試しください。",
-      });
-      return;
-    }
-
-    const controller = new AbortController();
-    const timeout = window.setTimeout(
-      () => controller.abort(),
-      REQUEST_TIMEOUT_MS,
-    );
-
-    try {
-      const response = await fetch(usersUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: normalizeEmail(values.email),
-          name: values.username,
-          password: values.password,
-        }),
-        signal: controller.signal,
-      });
-
-      if (response.ok) {
-        reset();
-        setSubmissionStatus({
-          type: "success",
-          message: "登録が完了しました。IssueDockへようこそ！",
-        });
-        return;
-      }
-
-      if (response.status === 409) {
+  const registerUserMutation = useMutation<void, Error, RegisterUserRequest>({
+    mutationKey: ["users", "register"],
+    mutationFn: registerUser,
+    onSuccess: () => {
+      reset();
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && error.status === 409) {
         setError("email", {
           message: "このメールアドレスはすでに登録されています",
         });
         setFocus("email");
-        return;
       }
+    },
+  });
 
-      if (response.status === 400) {
-        setSubmissionStatus({
-          type: "error",
-          message: "入力内容を確認して、もう一度お試しください。",
-        });
-        return;
-      }
-
-      setSubmissionStatus({
-        type: "error",
-        message: "登録できませんでした。時間をおいてもう一度お試しください。",
-      });
-    } catch (error) {
-      setSubmissionStatus({
-        type: "error",
-        message:
-          error instanceof DOMException && error.name === "AbortError"
-            ? "通信がタイムアウトしました。もう一度お試しください。"
-            : "サーバーに接続できませんでした。通信状況を確認してください。",
-      });
-    } finally {
-      window.clearTimeout(timeout);
-    }
+  const onSubmit = (values: SignupFormValues) => {
+    clearErrors("email");
+    registerUserMutation.mutate({
+      email: normalizeEmail(values.email),
+      name: values.username,
+      password: values.password,
+    });
   };
+
+  const submissionErrorMessage = registerUserMutation.isError
+    ? getSubmissionErrorMessage(registerUserMutation.error)
+    : null;
 
   return (
     <form
       noValidate
       onSubmit={handleSubmit(onSubmit)}
       onChange={() => {
-        if (submissionStatus) {
-          setSubmissionStatus(null);
+        if (!registerUserMutation.isIdle) {
+          registerUserMutation.reset();
         }
       }}
       className="space-y-5"
     >
-      <fieldset disabled={isSubmitting} className="space-y-5">
+      <fieldset disabled={registerUserMutation.isPending} className="space-y-5">
         <div>
           <Label htmlFor="email">メールアドレス</Label>
           <Input
@@ -230,7 +171,9 @@ export function SignupForm() {
               size="icon"
               className="absolute top-1 right-1 text-slate-500"
               onClick={() => setShowPassword((visible) => !visible)}
-              aria-label={showPassword ? "パスワードを隠す" : "パスワードを表示"}
+              aria-label={
+                showPassword ? "パスワードを隠す" : "パスワードを表示"
+              }
               aria-pressed={showPassword}
             >
               {showPassword ? (
@@ -240,7 +183,10 @@ export function SignupForm() {
               )}
             </Button>
           </div>
-          <p id="password-help" className="mt-1.5 text-xs text-muted-foreground">
+          <p
+            id="password-help"
+            className="mt-1.5 text-xs text-muted-foreground"
+          >
             8〜100文字で、英大文字・英小文字・数字・記号を含めてください
           </p>
           <FieldMessage
@@ -271,9 +217,7 @@ export function SignupForm() {
               variant="ghost"
               size="icon"
               className="absolute top-1 right-1 text-slate-500"
-              onClick={() =>
-                setShowPasswordConfirmation((visible) => !visible)
-              }
+              onClick={() => setShowPasswordConfirmation((visible) => !visible)}
               aria-label={
                 showPasswordConfirmation
                   ? "確認用パスワードを隠す"
@@ -294,37 +238,44 @@ export function SignupForm() {
           />
         </div>
 
-        {submissionStatus && (
+        {(registerUserMutation.isSuccess || submissionErrorMessage) && (
           <div
-            role={submissionStatus.type === "error" ? "alert" : "status"}
+            role={submissionErrorMessage ? "alert" : "status"}
             aria-live="polite"
             className={cn(
               "flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm leading-5",
-              submissionStatus.type === "success"
-                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                : "border-red-200 bg-red-50 text-red-700",
+              submissionErrorMessage
+                ? "border-red-200 bg-red-50 text-red-700"
+                : "border-emerald-200 bg-emerald-50 text-emerald-800",
             )}
           >
-            {submissionStatus.type === "success" ? (
-              <CheckCircle2
-                aria-hidden="true"
-                className="mt-0.5 size-4.5 shrink-0"
-              />
-            ) : (
+            {submissionErrorMessage ? (
               <AlertCircle
                 aria-hidden="true"
                 className="mt-0.5 size-4.5 shrink-0"
               />
+            ) : (
+              <CheckCircle2
+                aria-hidden="true"
+                className="mt-0.5 size-4.5 shrink-0"
+              />
             )}
-            <span>{submissionStatus.message}</span>
+            <span>
+              {submissionErrorMessage ??
+                "登録が完了しました。IssueDockへようこそ！"}
+            </span>
           </div>
         )}
 
-        <Button type="submit" className="mt-2 w-full" disabled={isSubmitting}>
-          {isSubmitting && (
+        <Button
+          type="submit"
+          className="mt-2 w-full"
+          disabled={registerUserMutation.isPending}
+        >
+          {registerUserMutation.isPending && (
             <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
           )}
-          {isSubmitting ? "登録しています…" : "登録する"}
+          {registerUserMutation.isPending ? "登録しています…" : "登録する"}
         </Button>
       </fieldset>
 
