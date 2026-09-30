@@ -13,6 +13,7 @@ import {
 import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -158,10 +159,8 @@ export function SignupForm() {
               className="pr-12"
               {...register("password")}
             />
-            <Button
+            <IconButton
               type="button"
-              variant="ghost"
-              size="icon"
               className="absolute top-1 right-1 text-slate-500"
               onClick={() => setShowPassword((visible) => !visible)}
               aria-label={
@@ -174,7 +173,7 @@ export function SignupForm() {
               ) : (
                 <Eye aria-hidden="true" className="size-4.5" />
               )}
-            </Button>
+            </IconButton>
           </div>
           <p
             id="password-help"
@@ -205,10 +204,8 @@ export function SignupForm() {
               className="pr-12"
               {...register("passwordConfirmation")}
             />
-            <Button
+            <IconButton
               type="button"
-              variant="ghost"
-              size="icon"
               className="absolute top-1 right-1 text-slate-500"
               onClick={() => setShowPasswordConfirmation((visible) => !visible)}
               aria-label={
@@ -223,7 +220,7 @@ export function SignupForm() {
               ) : (
                 <Eye aria-hidden="true" className="size-4.5" />
               )}
-            </Button>
+            </IconButton>
           </div>
           <FieldMessage
             id="password-confirmation-error"
