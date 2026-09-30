@@ -228,7 +228,7 @@ export function SignupForm() {
           />
         </div>
 
-        {(isMutationSuccess || isMutationError) && (
+        {(isMutationError || isMutationSuccess) && (
           <div
             role={isMutationError ? "alert" : "status"}
             aria-live="polite"
@@ -251,9 +251,9 @@ export function SignupForm() {
               />
             )}
             <span>
-              {isMutationSuccess
-                ? "登録が完了しました。IssueDockへようこそ！"
-                : "登録できませんでした。もう一度お試しください。"}
+              {isMutationError
+                ? "登録できませんでした。もう一度お試しください。"
+                : "登録が完了しました。IssueDockへようこそ！"}
             </span>
           </div>
         )}
